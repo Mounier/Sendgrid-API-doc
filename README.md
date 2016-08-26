@@ -1,14 +1,28 @@
+# Sommaire
+* [Installation](#installation)
+* [Prérequis](#prérequis)
+* [Identifcation](#identification)
+* [Structure générale](#structure générale)
+* [Les endpoints](#les endpoints)
+	* [Les contacts](#les contacts)
+	* [Le tracking](#le tracking)
+* [L'envoi de mails](#envoi de mails)
+
+<a name="installation"></a>
 # Installation
 
+<a name="prérequis"></a>
 ## Prérequis
 
 - Java version Oracle JDK 7, 8 ou OpenJDK 7
 - Le service Sendgrid, commençant au [free level](https://sendgrid.com/free?source=sendgrid-java)
 
+<a name="identification"></a>
 ## Identification
 
 Créer une clé API -> [SENDGRID_API_KEY](https://app.sendgrid.com/settings/api_keys).
 
+<a name="structure générale"></a>
 # Structure générale
 
 Premièrement, il faut initialiser un objet *Sendgrid* (avec la clé API) et un objet Request :
@@ -75,9 +89,10 @@ public static void main(String[] args) throws IOException {
   }
 }
 ```
-
+<a name="les endpoints"></a>
 # Les endpoints
 
+<a name="les contacts"></a>
 ## Les contacts
 
 Tout ce qui touche aux contacts en général est associé au endpoint "contactdb". Ce endpoint est la base de données des contacts pour la marketing campaign.
@@ -299,6 +314,7 @@ request.queryParams = queryParams;
 ...
 ```
 
+<a name="le tracking"></a>
 ## Le tracking
 
 Pour gérer le tracking des mails, Sendgrid organise son API autour de trois endpoints :
