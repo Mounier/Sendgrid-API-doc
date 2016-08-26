@@ -713,31 +713,128 @@ request.endpoint = "templates/{template_id}/versions/{version_id}/activate";
 
 ```Java
 ...
-Map<String, String> params = new HashMap<>();
-params.put(MailService.PARAM_TEMPLATE_ID, "7dac85e4-388e-400e-8e96-3b90422670f8");
-params.put(MailService.PARAM_FROM_NAME, "John");
-params.put(MailService.PARAM_FROM, "john@example.com");
-params.put(MailService.PARAM_BCC, "bob@example.com");
-params.put(MailService.PARAM_TO_NAME, "Alexane");
-params.put(MailService.PARAM_TO, "alexane@example.comr");
+import com.sendgrid.*;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.io.FileUtils;
+import org.springframework.util.Base64Utils;
 
-// prepare the REST call to SendGrid API
-Request request = new Request();
-request.method = Method.POST;
-request.endpoint = "mail/send";
-
-Map<String, String> substitutions = new HashMap<>();
-File attachmentFile = new File("yourFile.jpg");
-
-// build the JSON structure for the REST call
-Mail mail = this.buildEmail(params, substitutions, attachmentFile);
-request.body = mail.build();
-
-// do it
-Response response = sg.api(request);
-System.out.println(
-
-"sent an email, sengrid status: " + response.statusCode + " " + response.body + " " + response.headers);
-...
-```
+public class MailService {
+	public final static String PARAM_TEMPLATE_ID = "template";
+	public final static String PARAM_FROM = "from";
+	public final static String PARAM_FROM_NAME = "from-name";
+	public final static String PARAM_TO = "to";
+	public final static String PARAM_TO_NAME = "to-name";
+	public final static String PARAM_BCC = "bcc";
+	public final static String PARAM_SUBJECT = "subject";
+	private final static String API_KEY = "YOUR_API_KEY";
+	private SendGrid sendGrid;
 	
+	public MailService() {
+		this.sendGrid = new SendGrid(API_KEY);
+	}
+	
+	public void send(Map<String, String> params, Map<String, String> substitutions, File attachment)
+			throws IOException {
+		// prepare the REST call to SendGrid API
+		Request request = new Request();
+		request.method = Method.POST;
+		request.endpoint = "mail/send";
+
+		// build the JSON structure for the REST call
+		Mail mail = this.buildEmail(params, substitutions, attachment);
+		request.body = mail.build();
+
+		// do it
+		Response response = this.sendGrid.api(request);
+
+		System.out.println(
+				"sent an email, sengrid status: " + response.statusCode + " " + response.body + " " + response.headers);
+	}
+	
+	private Mail buildEmail(Map<String, String> params, Map<String, String> substitutions, File attachment)
+			throws IOException {
+		Mail result = new Mail();
+
+		// use the designated template
+		String templateId = params.get(PARAM_TEMPLATE_ID);
+		result.setTemplateId(templateId);
+
+		// build the From:
+		String from = params.get(PARAM_FROM);
+		Email fromEmail = new Email(from);
+
+		// optional, the displayed From: name
+		String fromName = params.get(PARAM_FROM_NAME);
+		if (fromName != null) {
+			fromEmail.setName(fromName);
+		}
+		result.setFrom(fromEmail);
+
+		// set up the recipient and its associated variable substitutions
+		Personalization personalization = new Personalization();
+
+		// build the To:
+		String to = params.get(PARAM_TO);
+		Email toEmail = new Email(to);
+
+		// optional, the displayed To: name
+		String toName = params.get(PARAM_TO_NAME);
+		if (toName != null) {
+			toEmail.setName(toName);
+		}
+		personalization.addTo(toEmail);
+
+		// add a Bcc: if asked
+		String bcc = params.get(PARAM_BCC);
+		if (bcc != null) {
+			personalization.addBcc(new Email(bcc));
+		}
+
+		// Subject:
+		String subject = params.get(PARAM_SUBJECT);
+		result.setSubject(subject);
+		personalization.setSubject(subject);
+
+		// set up the variable substitutions
+		if ((substitutions != null) && !substitutions.isEmpty()) {
+			for (Map.Entry<String, String> currSubEntry : substitutions.entrySet()) {
+				personalization.addSubstitution(currSubEntry.getKey(), currSubEntry.getValue());
+			}
+		}
+
+		Content contentHtml = new Content("text/html", "Test HTML"); // modifié
+		result.addContent(contentHtml);
+
+		// add the one and only personalization
+		result.addPersonalization(personalization);
+		
+		return result;
+	}
+}
+	
+	
+class Main {
+
+	public static void main(String[] args) throws Exception {	
+	
+		MailService mailService = new MailService();
+		Map<String, String> params = new HashMap<>();
+		
+		params.put(MailService.PARAM_TEMPLATE_ID, "7dac85e4-388e-400e-8e96-3b90422670f8");
+		params.put(MailService.PARAM_FROM_NAME, "John");
+		params.put(MailService.PARAM_FROM, "john@example.com");
+		params.put(MailService.PARAM_BCC, "bob@example.com");
+		params.put(MailService.PARAM_TO_NAME, "Alexane");
+		params.put(MailService.PARAM_TO, "alexane@example.comr");
+		
+		Map<String, String> substitutions = new HashMap<>();
+		File attachmentFile = new File("yourFile.jpg");
+		
+		mailService.send(params, substitutions, attachmentFile);
+	}
+}
