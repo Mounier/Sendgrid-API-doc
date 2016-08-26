@@ -1,11 +1,12 @@
 # Sommaire
 * [Installation](#installation)
 * [Prérequis](#prérequis)
-* [Identifcation](#identification)
+* [API key](#api key)
 * [Structure générale](#structure générale)
 * [Les endpoints](#les endpoints)
-	* [Les contacts](#les contacts)
-	* [Le tracking](#le tracking)
+	* [Contacts](#les contacts)
+	* [Tracking](#le tracking)
+	* [Template](#template)
 * [L'envoi de mails](#envoi de mails)
 
 <a name="installation"></a>
@@ -17,8 +18,8 @@
 - Java version Oracle JDK 7, 8 ou OpenJDK 7
 - Le service Sendgrid, commençant au [free level](https://sendgrid.com/free?source=sendgrid-java)
 
-<a name="identification"></a>
-## Identification
+<a name="api key"></a>
+## API key
 
 Créer une clé API -> [SENDGRID_API_KEY](https://app.sendgrid.com/settings/api_keys).
 
@@ -92,7 +93,7 @@ public static void main(String[] args) throws IOException {
 <a name="les endpoints"></a>
 # Les endpoints
 
-<a name="les contacts"></a>
+<a name="Contacts"></a>
 ## Les contacts
 
 Tout ce qui touche aux contacts en général est associé au endpoint "contactdb". Ce endpoint est la base de données des contacts pour la marketing campaign.
@@ -315,7 +316,7 @@ request.queryParams = queryParams;
 ```
 
 <a name="le tracking"></a>
-## Le tracking
+## Tracking
 
 Pour gérer le tracking des mails, Sendgrid organise son API autour de trois endpoints :
 
@@ -575,4 +576,168 @@ request.queryParams = queryParams;
 ...
 ```
 
+<a name="template"></a>
+## Template
 
+### Créer un template
+
+```java
+...
+request.method = Method.POST;
+request.endpoint = "templates";
+request.body = "{\"name\":\"example_name\"}";
+...
+```
+Une fois notre *example_template* créé, il faut récupérer son id depuis le *request.body*. Voici dans notre exemple à quoi ressemble le *request.body* : 
+```json
+{
+	"id":"3ad02638-c7f3-42c2-b1fc-86b0f4501729",
+	"name":"example_name",
+	"versions":[]
+}
+```
+Une fois l'id récupéré, on peut créer une nouvelle version de notre template. C'est dans cette version que l'on met le code html du template. Voici un exemple  d'une méthode se chargant de la creation d'une version de template, j'y instancie un objet *templateBody* qui va nous permettre de sérialiser cet objet en données JSON que l'API s'attend à recevoir :
+```java
+public void createNewTransactionalTemplateVersion(String versionName, File htmlContent, File plainContent, int active, String templateId, String subject) throws IOException {
+	try {
+		SendGrid sg = new SendGrid(this.apiKey);
+		Request request = new Request();
+		
+		request.method = Method.POST;
+		request.endpoint = "templates/"+templateId+"/versions";
+		
+		GsonBuilder builder = new GsonBuilder();
+		Gson gson = builder.disableHtmlEscaping().create();
+		String htmlString = FileUtils.readFileToString(htmlContent, "US-ASCII");
+		String contentString = FileUtils.readFileToString(plainContent, "UTF-8");
+		
+		TemplateBody templateBody = new TemplateBody(versionName, htmlString, contentString, active, templateId, subject);
+		String json = gson.toJson(templateBody);
+		
+		Response response = null;
+		try {
+			request.body = json;
+			response = sg.api(request);
+		} catch (HttpResponseException e) {
+			e.printStackTrace();
+		}
+	
+		System.out.println(response.statusCode);
+		System.out.println(response.body);
+		System.out.println(response.headers);
+		
+	} catch (IOException ex) {
+		throw ex;
+	}
+}
+
+public class TemplateBody {
+	
+	private String name;
+	private String html_content;
+	private String plain_content;
+	Integer active;
+	private String templateId;
+	private String subject;
+	
+	public TemplateBody(String name, String html_content, String plain_content, Integer active, String templateId,
+			String subject) {
+		super();
+		this.name = name;
+		this.html_content = html_content;
+		this.plain_content = plain_content;
+		this.active = active;
+		this.templateId = templateId;
+		this.subject = subject;
+	}
+	
+	@Override
+	public String toString() {
+		return "TemplateBody [name=" + name + ", html_content=" + html_content + ", plain_content=" + plain_content
+				+ ", active=" + active + ", templateId=" + templateId + ", subject=" + subject + "]";
+	}
+	
+	//GETTERS AND SETTERS
+}
+```
+NB : Il faudra ensuite s'assurer d'activer la version de notre template -> [activer une version de template](#activer_version_template)
+
+### Récupérer tous les templates
+
+```Java
+...
+    request.method = Method.GET;
+    request.endpoint = "templates";
+...
+```
+
+### Supprimer un template
+
+```Java
+...
+request.method = Method.DELETE;
+request.endpoint = "templates/{template_id}";
+...
+```
+
+### Récupérer une version d'un template
+
+```Java
+...
+request.method = Method.GET;
+request.endpoint = "templates/{template_id}/versions/{version_id}";
+...
+```
+
+### Supprimer une version d'un template
+
+```Java
+...
+request.method = Method.DELETE;
+request.endpoint = "templates/{template_id}/versions/{version_id}";
+...
+```
+
+<a name="activer_version_template"></a>
+### Activer une version de template
+
+```Java
+...
+request.method = Method.POST;
+request.endpoint = "templates/{template_id}/versions/{version_id}/activate";
+...
+```
+
+<a name="envoi de mails"></a>
+# L'envoi de mails
+
+```Java
+...
+Map<String, String> params = new HashMap<>();
+params.put(MailService.PARAM_TEMPLATE_ID, "7dac85e4-388e-400e-8e96-3b90422670f8");
+params.put(MailService.PARAM_FROM_NAME, "John");
+params.put(MailService.PARAM_FROM, "john@example.com");
+params.put(MailService.PARAM_BCC, "bob@example.com");
+params.put(MailService.PARAM_TO_NAME, "Alexane");
+params.put(MailService.PARAM_TO, "alexane@example.comr");
+
+// prepare the REST call to SendGrid API
+Request request = new Request();
+request.method = Method.POST;
+request.endpoint = "mail/send";
+
+Map<String, String> substitutions = new HashMap<>();
+File attachmentFile = new File("yourFile.jpg");
+
+// build the JSON structure for the REST call
+Mail mail = this.buildEmail(params, substitutions, attachmentFile);
+request.body = mail.build();
+
+// do it
+Response response = sg.api(request);
+System.out.println(
+
+"sent an email, sengrid status: " + response.statusCode + " " + response.body + " " + response.headers);
+...
+```
+	
